@@ -2,6 +2,11 @@ import tensorflow as tf
 import numpy as np
 import os,sys,json
 import logging,logging.config,pathlib
+import pickle,uuid,time,pdb,gensim,itertools
+from collections import defaultdict as ddict
+from sklearn.metrics import precision_recall_fscore_support, precision_recall_curve, average_precision_score
+from pprint import pprint
+#所有文件的库都在这里导入
 
 #设置numpy的精度
 np.set_printoptions(precision=4)
