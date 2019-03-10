@@ -6,7 +6,7 @@ import pdb
 import re
 import unicodedata
 import nltk
-import tqdm
+from tqdm import tqdm
 rel2id = json.loads(open("./data/rel2id.json",encoding='utf-8').read())
 id2rel = dict([(v, k) for k, v in rel2id.items()])
 data = {"train": [], "test": []}
@@ -303,7 +303,8 @@ final_data={
     "test":procData(data['test'],'test'),
     "voc2id":voc2id,
     "id2voc":id2voc,
-    "max_pos":(MAX_POS+1)*2+1
+    "max_pos":(MAX_POS+1)*2+1,
+    "rel2id":rel2id
 }
 print('writing final_data')
 pickle.dump(final_data,open("{}_processed.pkl".format("riedel"),'wb'))

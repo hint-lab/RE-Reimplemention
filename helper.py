@@ -32,7 +32,7 @@ def checkFile(filename):
 
 #创建路径
 def make_dir(dir_path):
-    if not os.path.exits(dir_path):
+    if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
 #tensorflow模型debug
@@ -42,13 +42,13 @@ def debug_nn(res_list,feed_dict):
     sess=tf.Session(config=config)
     sess.run(tf.global_variables_initializer())
     summary_writer=tf.summary.FileWriter("tf_board/debug_nn",sess.graph)
-    res=sess.run(reslist,feed_dict=feed_dict)
+    res=sess.run(res_list,feed_dict=feed_dict)
     return res
 
 #创建日志器
 def get_logger(name,log_dir,config_dir):
     make_dir(log_dir)
-    config_dict=json.loag(open(config_dir+'log_config.json'))
+    config_dict=json.load(open(config_dir+'log_config.json'))
     config_dict['handlers']['file_handler']['filename']=log_dir+name.replace('/','-')
     logging.config.dictConfig(config_dict)
     logger=logging.getLogger(name)
