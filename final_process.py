@@ -11,9 +11,7 @@ rel2id = json.loads(open("./data/rel2id.json",encoding='utf-8').read())
 id2rel = dict([(v, k) for k, v in rel2id.items()])
 data = {"train": [], "test": []}
 
-def unicode_to_ascii(s):
-    return ''.join(c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn')
+
 
 def read_file(file_path):
     temp = []
@@ -26,15 +24,7 @@ def read_file(file_path):
             head_pos_list = []
             tail_pos_list = []
             wrds_list = []
-            for sent in bag["sentence"]:
-                w=sent['sent']
-                w = unicode_to_ascii(w.strip())
-                w = re.sub(r"([?.!,])", r" \1 ", w)
 
-                w = re.sub(r"[^a-zA-Z]+", " ", w)
-                w = re.sub(r'[" "]+', " ", w)
-                w = w.rstrip().strip()
-                sent['sent']=w
 
             # print('complete substitution')
 
@@ -58,13 +48,17 @@ def read_file(file_path):
             # print('complete adding nlp')
             #print(bag)
             count=0
-            if k== 1838:
 
-                print(len(bag['sentence']))
-                print(bag)
+            #debug
+            # if k>=90000:
+            #     print(len(bag['sentence']))
+            #     print(bag)
+
             for sent in bag["sentence"]:
-                if k==1838:
-                    print(sent)
+                #debug
+                # if k>=90000:
+                #     print(sent)
+
                 # 输出head词和tail词在句子中的索引位置到(list)head_start_off和(list)tail_start_off，先找一个词的索引位置，再找另一个词，且另一个词的索引位置必须在第一个词
                 # 的第一个字之前或最后一个字之后
                 # 实体词由一个字或两个字组成，先分为len(head)>len(tail)和len(head)<=len(tail)
@@ -89,7 +83,7 @@ def read_file(file_path):
                     if tail_start_off == []:
                         tail_start_off = [
                             m.start() for m in re.finditer(
-                                bag["head"].replace("_", " "),
+                                bag["tail"].replace("_", " "),
                                 sent["sent"].replace("_", " ")
                             )
                         ]
@@ -101,8 +95,7 @@ def read_file(file_path):
                     ]  # 筛选tail_start_off，tail词的句子列表索引位置,必须满足在head词的第一个字之前，或在最后一个字之后
                 else:  # head词和tail词一样长，或head词短于tail词
                     tail_idx = [
-                        i for i, e in enumerate(sent["sent"].split())
-                        if e == bag["tail"]
+                        i for i, e in enumerate(sent["sent"].split()) if e == bag["tail"]
                     ]
                     tail_start_off = [
                         len(" ".join(sent["sent"].split()[0:idx])) + (1 if idx != 0 else 0) for idx in tail_idx
@@ -117,8 +110,7 @@ def read_file(file_path):
                     reserve_span = [(start_off, start_off + len(bag["tail"]))
                                     for start_off in tail_start_off]  # tail词的span
                     head_idx = [
-                        i for i, e in enumerate(sent["sent"].split())
-                        if e == bag["head"]
+                        i for i, e in enumerate(sent["sent"].split()) if e == bag["head"]
                     ]
                     head_start_off = [
                         len(" ".join(sent["sent"].split()[0:idx])) + (1 if idx != 0 else 0) for idx in head_idx
@@ -214,17 +206,17 @@ def read_file(file_path):
                 # 'dep_links_list':	dep_links_list,
             })
 
-            print('Completed {}'.format(k))
+            if k%10000==0:print('Completed {}'.format(k))
             # if not args.FULL and k > args.sample_size: break
     return temp
 
 
-data['train'] = read_file("./data/train_template.json")
-#data['test'] = read_file("./data/test_bags.json")
+data['train'] = read_file("./data/train_bags.json")
+data['test'] = read_file("./data/test_bags.json")
 print('Bags processed:Train:{},Test:{}'.format(len(data['train']),len(data['test'])))
 
 """*************************************删除离群数据****************************************"""
-print('before remove',data['train'])
+
 del_cnt = 0
 MAX_WORDS = 100
 for dtype in ['train', 'test']:
@@ -247,7 +239,7 @@ print('Bags deleted {}'.format(del_cnt))
 MAX_VOCAB=150000
 #词频字典
 voc_freq=ddict(int)
-print('after remove',data['train'])
+
 for bag in data['train']:
     for sentence in bag['wrds_list']:
         for wrd in sentence:
@@ -313,5 +305,5 @@ final_data={
     "id2voc":id2voc,
     "max_pos":(MAX_POS+1)*2+1
 }
-print(final_data)
+print('writing final_data')
 pickle.dump(final_data,open("{}_processed.pkl".format("riedel"),'wb'))
