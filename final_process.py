@@ -188,11 +188,11 @@ def read_file(file_path):
                 mask=[]
                 for i in range(tok_idx-1):
                     if i <=pos_min:
-                        mask[i]=1
+                        mask.append(1)
                     elif i<=pos_max:
-                        mask[i]=2
+                        mask.append(2)
                     else:
-                        mask[i]=3
+                        mask.append(3)
 
                 wrds_list.append(wrds)
                 pos1_list.append(pos1)
