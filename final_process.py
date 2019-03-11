@@ -24,7 +24,7 @@ def read_file(file_path):
             head_pos_list = []
             tail_pos_list = []
             wrds_list = []
-
+            mask_list = []
 
             # print('complete substitution')
 
@@ -182,12 +182,24 @@ def read_file(file_path):
                 wrds = ['_'.join(e).lower() for e in tid2wrd.values()]
                 pos1 = [i - head_pos for i in range(tok_idx - 1)]  # tok_id = (number of tokens + 1)
                 pos2 = [i - tail_pos for i in range(tok_idx - 1)]
+                #计算mask list，用于piecewise pooling
+                pos_min=min(head_pos,tail_pos)
+                pos_max=max(head_pos,tail_pos)
+                mask=[]
+                for i in range(tok_idx-1):
+                    if i <=pos_min:
+                        mask[i]=1
+                    elif i<=pos_max:
+                        mask[i]=2
+                    else:
+                        mask[i]=3
 
                 wrds_list.append(wrds)
                 pos1_list.append(pos1)
                 pos2_list.append(pos2)
                 head_pos_list.append(head_pos)
                 tail_pos_list.append(tail_pos)
+                mask_list.append(mask)
                 count+=1
 
 
@@ -201,6 +213,7 @@ def read_file(file_path):
                 'wrds_list': wrds_list,
                 'pos1_list': pos1_list,
                 'pos2_list': pos2_list,
+                'mask_list': mask_list
                 # 'sub_type': ent2type[bag['sub_id']],
                 # 'obj_type': ent2type[bag['obj_id']],
                 # 'dep_links_list':	dep_links_list,
@@ -227,6 +240,7 @@ for dtype in ['train', 'test']:
             data[dtype][i]['wrds_list'][j] = data[dtype][i]['wrds_list'][j][:MAX_WORDS]
             data[dtype][i]['pos1_list'][j] = data[dtype][i]['pos1_list'][j][:MAX_WORDS]
             data[dtype][i]['pos2_list'][j] = data[dtype][i]['pos2_list'][j][:MAX_WORDS]
+            data[dtype][i]['mask_list'][j] = data[dtype][i]['mask_list'][j][:MAX_WORDS]
 
         if len(data[dtype][i]['wrds_list']) == 0:
             del data[dtype][i]
@@ -277,7 +291,7 @@ def getId(wrd,wrd2id,def_val='NONE'):
         return wrd2id[def_val]
 
 def posMap(pos):
-    if pos<-MAX_POS:
+    if pos< -MAX_POS:
         return 0
     elif pos > MAX_POS:
         return (MAX_POS+1)*2
@@ -292,6 +306,7 @@ def procData(data,split='train'):
         res['X']=[[getId(wrd,voc2id,'UNK') for wrd in wrds] for wrds in bag['wrds_list']]
         res['Pos1']=[[posMap(pos) for pos in pos1] for pos1 in bag['pos1_list']]
         res['Pos2']=[[posMap(pos) for pos in pos2] for pos2 in bag['pos2_list']]
+        res['Mask']=bag['mask_list']
         res['Y']=bag['rels']
         res['HeadPos']=bag['head_pos_list']
         res['TailPos']=bag['tail_pos_list']
