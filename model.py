@@ -26,6 +26,7 @@ class Model(object):
         self.train_op = self.add_optimizer(self.loss)
 
         tf.summary.scalar('accuracy', self.accuracy)
+        tf.summary.scalar('loss',self.loss)
         self.merged_summary = tf.summary.merge_all()
         self.summary_writer = None
 
@@ -170,7 +171,7 @@ class Model(object):
 
         return temp
 
-    def create_feed_dict(self, batch, wLabels=True, dtype='train'):
+    def create_feed_dict(self, batch, wLabels=True, split='train'):
         # 创建feed_dict传入计算图
         X, Y, pos1, pos2, mask, sent_num = batch['X'], batch['Y'], batch['Pos1'], batch['Pos2'], batch['Mask'], batch[
             'sent_num']
@@ -194,7 +195,7 @@ class Model(object):
         if wLabels:
             feed_dict[self.input_y] = y_hot
 
-        if dtype != 'train':
+        if split != 'train':
             feed_dict[self.dropout] = 1.0
         else:
             feed_dict[self.dropout] = self.params.dropout
@@ -347,7 +348,7 @@ class Model(object):
 
         for step, batch in enumerate(self.getBatches(data, shuffle)):
             loss, logits, accuracy = sess.run([self.loss, self.logits, self.accuracy],
-                                              feed_dict=self.create_feed_dict(batch, dtype='test'))
+                                              feed_dict=self.create_feed_dict(batch, split='test'))
             losses.append(loss)
             accuracies.append(accuracy)
 
@@ -407,9 +408,9 @@ class Model(object):
     def fit(self, sess):
         self.summary_writer = tf.summary.FileWriter('tf_board/{}'.format(self.params.name), sess.graph)
         saver = tf.train.Saver()
-        save_dir = 'checkpoints/{}/'.format(self.params.name)
+        save_dir = './checkpoints/{}/'.format(self.params.name);
         make_dir(save_dir)
-        res_dir = 'results/{}/'.format(self.params.name)
+        res_dir = './results/{}/'.format(self.params.name);
         make_dir(res_dir)
         save_path = os.path.join(save_dir, 'best_model')
 
@@ -448,8 +449,8 @@ class Model(object):
         self.logger.info(
             'Final results:Prec:{} | Recall:{} | F1:{} | Area:{}'.format(test_prec, test_recall, test_f1, area_pr))
         # store predictions
-        pickle.dump({'logit list': logit_list, 'y_hot': y_hot},
-                    open('results/{}/prec_recall.pkl'.format(self.params.name), 'wb'))
+        pickle.dump({'logit_list': logit_list, 'y_hot': y_hot},
+                    open('results/{}/precision_recall.pkl'.format(self.params.name), 'wb'))
 
         # p@n evaluation
         # p@1
@@ -488,7 +489,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="reconstruction of PCNN"
     )
-    parser.add_argument('-name', dest='name', default='test_' + str(uuid.uuid4()), help='name of the run')
+    parser.add_argument('-name', dest='name', required=True, default='test_' + str(uuid.uuid4()), help='name of the run')
     parser.add_argument('-log_dir', dest='log_dir', default='./log/', help='log directory')
     parser.add_argument('-config_dir', dest='config_dir', default='./config/', help='config directorty')
     parser.add_argument('-data', dest='dataset', default='./riedel_processed.pkl', help='dataset to use')
