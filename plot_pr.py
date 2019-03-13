@@ -7,19 +7,19 @@ import pdb
 def loadData(path):
 	preds 	   	= pickle.load(open(path, 'rb'))
 	y_hot 	   	= np.array(preds['y_hot'])
-	logit_list 	= np.array(preds['logit list'])
+	logit_list 	= np.array(preds['logit_list'])
 	y_hot_new       = np.reshape(np.array([x[1:] for x in y_hot]),      (-1))
 	logit_list_new  = np.reshape(np.array([x[1:] for x in logit_list]), (-1))
 	return y_hot_new, logit_list_new
 
 def plotPR(dataset):
-	y_true, y_scores 	   = loadData('./results/{}/prec_recall.pkl'.format(args.name))
+	y_true, y_scores 	   = loadData('./results/{}/precision_recall.pkl'.format(args.name))
 	precision,recall,threshold = precision_recall_curve(y_true,y_scores)
 	area_under 	   	   = average_precision_score(y_true, y_scores)
 	baselines_path 		   = './baselines_pr/{}/'.format(dataset)
 	print('Area under the curve: {:.3}'.format(area_under))
 
-	plt.plot(recall[:], precision[:], label='pcnn+word_att', color ='red', lw=1, marker = 'o', markevery = 0.1, ms = 6)
+	plt.plot(recall[:], precision[:], label=args.name, color ='red', lw=1, marker = 'o', markevery = 0.1, ms = 6)
 
 	if dataset == 'riedel_nyt':
 		base_list = ['BGWA', 'PCNN+ATT', 'PCNN', 'MIMLRE', 'MultiR', 'Mintz']

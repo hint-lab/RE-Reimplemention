@@ -259,6 +259,9 @@ class Model(object):
         #串联经word att得到的句子表示和经cnn得到的句子表示
         sent_repre=tf.concat([sent_repre,x],axis=1)
         de_out_dim=embeds_dim+cnn_out_dim
+        #仅用pcnn
+        # sent_repre=x
+        # de_out_dim=cnn_out_dim
 
         with tf.variable_scope('sentence_attention') as scope:
             sentence_query = tf.get_variable('sentence_query', [de_out_dim, 1],
