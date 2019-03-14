@@ -26,7 +26,7 @@ class Model(object):
         self.train_op = self.add_optimizer(self.loss)
 
         tf.summary.scalar('accuracy', self.accuracy)
-        tf.summary.scalar('loss',self.loss)
+        tf.summary.scalar('loss', self.loss)
         self.merged_summary = tf.summary.merge_all()
         self.summary_writer = None
 
@@ -224,7 +224,7 @@ class Model(object):
         pos1_embeded = tf.nn.embedding_lookup(pos1_embeddings, input_pos1)
         pos2_embeded = tf.nn.embedding_lookup(pos2_embeddings, input_pos2)
         embeds = tf.concat([word_embeded, pos1_embeded, pos2_embeded], axis=2)
-        embeds_dim=self.params.embed_dim+2*self.params.pos_dim
+        embeds_dim = self.params.embed_dim + 2 * self.params.pos_dim
 
         with tf.variable_scope('word_attention') as scope:
             word_query = tf.get_variable('word_query', [embeds_dim, 1],
@@ -235,10 +235,11 @@ class Model(object):
                         tf.nn.softmax(
                             tf.reshape(
                                 tf.matmul(
-                                    tf.reshape(tf.tanh(embeds),[self.total_sents*self.seq_len,embeds_dim]), word_query
+                                    tf.reshape(tf.tanh(embeds), [self.total_sents * self.seq_len, embeds_dim]),
+                                    word_query
                                 ), [self.total_sents, self.seq_len]
                             )
-                        ), [self.total_sents, 1,self.seq_len]
+                        ), [self.total_sents, 1, self.seq_len]
                     ), embeds
                 ), [self.total_sents, embeds_dim]
             )
@@ -256,10 +257,10 @@ class Model(object):
             x = tf.contrib.layers.dropout(x, keep_prob=self.params.dropout)
             cnn_out_dim = self.params.cnn_dim * 3
 
-        #串联经word att得到的句子表示和经cnn得到的句子表示
-        sent_repre=tf.concat([sent_repre,x],axis=1)
-        de_out_dim=embeds_dim+cnn_out_dim
-        #仅用pcnn
+        # 串联经word att得到的句子表示和经cnn得到的句子表示
+        sent_repre = tf.concat([sent_repre, x], axis=1)
+        de_out_dim = embeds_dim + cnn_out_dim
+        # 仅用pcnn
         # sent_repre=x
         # de_out_dim=cnn_out_dim
 
@@ -304,7 +305,23 @@ class Model(object):
 
     def add_loss(self, nn_out):
         with tf.name_scope('loss_op'):
-            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=nn_out, labels=self.input_y))
+            def focal_loss(logits, labels, alpha, gamma):
+                labels=tf.cast(labels,tf.float32)
+                sigmoid_p = tf.nn.sigmoid(logits)
+                zeros = array_ops.zeros_like(sigmoid_p, dtype=sigmoid_p.dtype)
+                pos_p_sub = array_ops.where(
+                    labels > zeros, labels - sigmoid_p, zeros
+                )
+                neg_p_sub = array_ops.where(
+                    labels > zeros, zeros, sigmoid_p
+                )
+                per_entry_cross_ent = -alpha * (pos_p_sub ** gamma) * tf.log(tf.clip_by_value(sigmoid_p, 1e-8, 1.0)) - (
+                            1 - alpha) * (neg_p_sub **gamma)*tf.log(tf.clip_by_value(1.0-sigmoid_p,1e-8,1.0))
+                return tf.reduce_sum(per_entry_cross_ent)
+
+            loss=focal_loss(nn_out,self.input_y,alpha=self.params.alpha,gamma=2)
+
+            #loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=nn_out, labels=self.input_y))
             if self.regularizer != None:
                 loss += tf.contrib.layers.apply_regularization(self.regularizer,
                                                                tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
@@ -332,13 +349,17 @@ class Model(object):
             bag_count += len(batch['sent_num'])
 
             if step % 10 == 0:
-                self.logger.info('Epoch:{} Train Accuracy({}/{}):\t{:.5}\tLoss:{:.5}\t{}\tBest Train Acc:{:.5}'.format(epoch, bag_count,
-                                                                                               len(self.data['train']),
-                                                                                               np.mean(
-                                                                                                   accuracies) * 100,
-                                                                                               np.mean(losses),
-                                                                                               self.params.name,
-                                                                                               self.best_train_acc))
+                self.logger.info(
+                    'Epoch:{} Train Accuracy({}/{}):\t{:.5}\tLoss:{:.5}\t{}\tBest Train Acc:{:.5}'.format(epoch,
+                                                                                                          bag_count,
+                                                                                                          len(self.data[
+                                                                                                                  'train']),
+                                                                                                          np.mean(
+                                                                                                              accuracies) * 100,
+                                                                                                          np.mean(
+                                                                                                              losses),
+                                                                                                          self.params.name,
+                                                                                                          self.best_train_acc))
                 self.summary_writer.add_summary(summary_str, epoch * len(self.data['train']) + bag_count)
 
         accuracy = np.mean(accuracies) * 100.0
@@ -423,7 +444,7 @@ class Model(object):
         # train model
         if not self.params.only_eval:
             self.best_train_acc = 0.0
-            not_best_count=0 # Stop training after several epochs without improvement.
+            not_best_count = 0  # Stop training after several epochs without improvement.
             for epoch in range(self.params.max_epochs):
                 train_loss, train_acc = self.run_epoch(sess, self.data['train'], epoch)
                 self.logger.info(
@@ -438,7 +459,6 @@ class Model(object):
                 #     not_best_count+=1
                 # if not_best_count>= 10:
                 #     break
-
 
         # evaluation on test
         saver.restore(sess, save_path)
@@ -492,15 +512,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="reconstruction of PCNN"
     )
-    parser.add_argument('-name', dest='name', required=True, default='test_' + str(uuid.uuid4()), help='name of the run')
+    parser.add_argument('-name', dest='name', required=True, default='test_' + str(uuid.uuid4()),
+                        help='name of the run')
     parser.add_argument('-log_dir', dest='log_dir', default='./log/', help='log directory')
     parser.add_argument('-config_dir', dest='config_dir', default='./config/', help='config directorty')
     parser.add_argument('-data', dest='dataset', default='./riedel_processed.pkl', help='dataset to use')
     parser.add_argument('-gpu', dest='gpu', default='0', help='gpu to use')
     parser.add_argument('-cnn_dim', dest='cnn_dim', default=230, type=int, help='hidden state dimention of cnn')
     parser.add_argument('-pos_dim', dest='pos_dim', default=16, type=int, help='dimension of positional embedding')
-    parser.add_argument('-drop', dest='dropout', default=0.8, type=float, help='Dropout for fully connected layer')
-    parser.add_argument('-batch_size', dest='batch_size', default=32, type=int, help='Batch size')
+    parser.add_argument('-drop', dest='dropout', default=0.5, type=float, help='Dropout for fully connected layer')
+    parser.add_argument('-batch_size', dest='batch_size', default=64, type=int, help='Batch size')
     parser.add_argument('-l2', dest='l2', default=0.001, type=float, help='l2 regularization')
     parser.add_argument('-embed_loc', dest='embed_loc', default='./glove/glove.6B.50d_word2vec.txt',
                         help='embed location')
@@ -514,6 +535,7 @@ if __name__ == "__main__":
     parser.add_argument('-eps', dest='eps', default=0.00000001, type=float, help='value of epsilon')
     parser.add_argument('-chunk', dest='chunk_size', default=1000, type=int, help='chunk size')
     parser.add_argument('-seed', dest='seed', default=1234, type=int, help='seed for randomization')
+    parser.add_argument('-alpha',dest='alpha',default=0.25,type=float,help='alpha in focal loss')
     args = parser.parse_args()
 
     if not args.restore:

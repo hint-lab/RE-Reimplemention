@@ -6,6 +6,7 @@ import pickle,uuid,time,pdb,gensim,itertools
 from collections import defaultdict as ddict
 from sklearn.metrics import precision_recall_fscore_support, precision_recall_curve, average_precision_score
 from pprint import pprint
+from tensorflow.python.ops import array_ops
 #所有文件的库都在这里导入
 
 #设置numpy的精度
