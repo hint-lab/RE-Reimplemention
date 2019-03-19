@@ -1,6 +1,6 @@
 import tensorflow as tf
 from helper import *
-
+import embeddings
 
 class Model(object):
 
@@ -205,12 +205,12 @@ class Model(object):
     def add_model(self):
         input_words, input_pos1, input_pos2, mask = self.input_x, self.input_pos1, self.input_pos2, self.mask
 
-        with tf.variable_scope('Embeddings') as scope:
+        with tf.variable_scope('word_embedding') as scope:
             model = gensim.models.KeyedVectors.load_word2vec_format(self.params.embed_loc, binary=False)
-            embed_init = getEmbeddings(model, self.word_list, self.params.embed_dim)
+            embed_init = getEmbeddings(model, self.word_list, self.params.word_embed_dim)
             _word_embeddings = tf.get_variable('embeddings', initializer=embed_init, trainable=True,
                                                regularizer=self.regularizer)
-            word_pad = tf.zeros([1, self.params.embed_dim])
+            word_pad = tf.zeros([1, self.params.word_embed_dim])
             word_embeddings = tf.concat([word_pad, _word_embeddings], axis=0)
 
             pos1_embeddings = tf.get_variable('pos1_embeddings', [self.max_pos, self.params.pos_dim],
@@ -224,10 +224,17 @@ class Model(object):
         pos1_embeded = tf.nn.embedding_lookup(pos1_embeddings, input_pos1)
         pos2_embeded = tf.nn.embedding_lookup(pos2_embeddings, input_pos2)
         embeds = tf.concat([word_embeded, pos1_embeded, pos2_embeded], axis=2)
-        embeds_dim = self.params.embed_dim + 2 * self.params.pos_dim
+        embeds_dim = self.params.word_embed_dim + 2 * self.params.pos_dim
+
+        with tf.variable_scope('Bi_lstm') as scope:
+            rnn_cell=tf.keras.layers.GRU(self.params.rnn_dim,dropout=self.params.rec_dropout,return_sequences=True,return_state=True)
+            hidden_states,cell_state=tf.keras.layers.Bidirectional(rnn_cell,merge_mode='concat')(embeds)
+
+            rnn_output_dim=self.params.lstm_dim*2
+              
 
         with tf.variable_scope('word_attention') as scope:
-            word_query = tf.get_variable('word_query', [embeds_dim, 1],
+            word_query = tf.get_variable('word_query', [rnn_output_dim, 1],
                                          initializer=tf.contrib.layers.xavier_initializer())
             sent_repre = tf.reshape(
                 tf.matmul(
@@ -235,15 +242,17 @@ class Model(object):
                         tf.nn.softmax(
                             tf.reshape(
                                 tf.matmul(
-                                    tf.reshape(tf.tanh(embeds), [self.total_sents * self.seq_len, embeds_dim]),
+                                    tf.reshape(tf.tanh(cell_state), [self.total_sents * self.seq_len, rnn_output_dim]),
                                     word_query
                                 ), [self.total_sents, self.seq_len]
                             )
                         ), [self.total_sents, 1, self.seq_len]
-                    ), embeds
-                ), [self.total_sents, embeds_dim]
+                    ), cell_state
+                ), [self.total_sents, rnn_output_dim]
             )
 
+        #pcnn 句子编码
+        '''
         with tf.variable_scope('pcnn') as scope:
             x = tf.layers.conv1d(inputs=embeds, filters=self.params.cnn_dim, kernel_size=3, strides=1, padding='same',
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
@@ -256,13 +265,37 @@ class Model(object):
             x = tf.nn.relu(x)
             x = tf.contrib.layers.dropout(x, keep_prob=self.params.dropout)
             cnn_out_dim = self.params.cnn_dim * 3
+        '''
+        #为迁移特征做预训练的encoder结构，Semi-Supervised Sequence Modeling with Cross-View Training
+        '''
+        #character level embedding,input chars在输入中加入charater类型
+        with tf.variable_scope('char_embedding') as scope:
+            char_embedding_matrix=tf.get_variable('char_embeddings',shape=[embeddings.NUM_CHARS,self.params.char_embed_dim])
+            char_embeddings=tf.nn.embedding_lookup(char_embedding_matrix,input_chars)
+            shape=tf.shape(char_embeddings)
+            char_embeddings=tf.reshape(char_embeddings,shape=[-1,shape[-2],self.params.char_embed_size])
+            char_reprs=[]
+            for filter_width in self.params.char_cnn_n_filters,filter_width):
+                conv=tf.layers.conv1d(char_embeddings,self.params.char_cnn_n_filters,filter_width)
+                conv=tf.nn.relu(conv)
+                conv=tf.nn.dropout(tf.reduce_max(conv,axis=1))
+        '''
+        
 
+
+        # 句子编码
         # 串联经word att得到的句子表示和经cnn得到的句子表示
-        sent_repre = tf.concat([sent_repre, x], axis=1)
-        de_out_dim = embeds_dim + cnn_out_dim
+        # sent_repre = tf.concat([sent_repre, x], axis=1)
+        # de_out_dim = embeds_dim + cnn_out_dim
+
         # 仅用pcnn
         # sent_repre=x
         # de_out_dim=cnn_out_dim
+
+        # 仅用biGru
+        de_out_dim=rnn_output_dim
+
+        # 包的表示
 
         with tf.variable_scope('sentence_attention') as scope:
             sentence_query = tf.get_variable('sentence_query', [de_out_dim, 1],
@@ -525,7 +558,7 @@ if __name__ == "__main__":
     parser.add_argument('-l2', dest='l2', default=0.001, type=float, help='l2 regularization')
     parser.add_argument('-embed_loc', dest='embed_loc', default='./glove/glove.6B.50d_word2vec.txt',
                         help='embed location')
-    parser.add_argument('-embed_dim', dest='embed_dim', default=50, type=int, help='embed dimension')
+    parser.add_argument('-word_embed_dim', dest='word_embed_dim', default=50, type=int, help='word embed dimension')
     parser.add_argument('-optimizer', dest='optimizer', default='adam', help='optimizer for training')
     parser.add_argument('-restore', dest='restore', action='store_true', help='restore from the previous best model')
     parser.add_argument('-lr', dest='lr', default=0.001, type=float, help='learning rate')
@@ -536,6 +569,9 @@ if __name__ == "__main__":
     parser.add_argument('-chunk', dest='chunk_size', default=1000, type=int, help='chunk size')
     parser.add_argument('-seed', dest='seed', default=1234, type=int, help='seed for randomization')
     parser.add_argument('-alpha',dest='alpha',default=0.25,type=float,help='alpha in focal loss')
+    parser.add_argument('-char_embed_size',dest='char_embed_size',default=16,type=int,help='character embed dimension')#用于character embedding
+    parser.add_argument('-rnn_dim',dest='rnn_dim',default=192,type=int,help='hidden state dimention of Bi-RNN')
+    parser.add_argument('-rec_dropout',dest='rec_dropout',default=0.8,type=float,help='recurrent dropout for lstm')
     args = parser.parse_args()
 
     if not args.restore:
