@@ -228,7 +228,7 @@ class Model(object):
 
         with tf.variable_scope('Bi_lstm') as scope:
             rnn_cell=tf.keras.layers.GRU(self.params.rnn_dim,dropout=self.params.rec_dropout,return_sequences=True,return_state=True)
-            hidden_states,cell_state=tf.keras.layers.Bidirectional(rnn_cell,merge_mode='concat')(embeds)
+            hidden_states,_=tf.keras.layers.Bidirectional(rnn_cell,merge_mode='concat')(embeds)
 
             rnn_output_dim=self.params.lstm_dim*2
               
@@ -242,12 +242,12 @@ class Model(object):
                         tf.nn.softmax(
                             tf.reshape(
                                 tf.matmul(
-                                    tf.reshape(tf.tanh(cell_state), [self.total_sents * self.seq_len, rnn_output_dim]),
+                                    tf.reshape(tf.tanh(hidden_states), [self.total_sents * self.seq_len, rnn_output_dim]),
                                     word_query
                                 ), [self.total_sents, self.seq_len]
                             )
                         ), [self.total_sents, 1, self.seq_len]
-                    ), cell_state
+                    ), hidden_states
                 ), [self.total_sents, rnn_output_dim]
             )
 
