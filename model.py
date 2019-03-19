@@ -226,13 +226,18 @@ class Model(object):
         embeds = tf.concat([word_embeded, pos1_embeded, pos2_embeded], axis=2)
         embeds_dim = self.params.word_embed_dim + 2 * self.params.pos_dim
 
-        with tf.variable_scope('Bi_lstm') as scope:
-            rnn_cell=tf.keras.layers.GRU(self.params.rnn_dim,dropout=self.params.rec_dropout,return_sequences=True,return_state=True)
-            hidden_states,_=tf.keras.layers.Bidirectional(rnn_cell,merge_mode='concat')(embeds)
+        with tf.variable_scope('Bi_rnn') as scope:
+            rnn_cell=tf.keras.layers.GRU(self.params.rnn_dim,dropout=self.params.rec_dropout,return_sequences=True)
+            hidden_states=tf.keras.layers.Bidirectional(rnn_cell,merge_mode='concat')(embeds)
 
-            rnn_output_dim=self.params.lstm_dim*2
+            rnn_output_dim=self.params.rnn_dim*2
               
+        with tf.variable_scope('Bi_rnn2') as scope:
+            rnn_cell2=tf.keras.layers.GRU(self.params.rnn2_dim,dropout=self.params.rec_dropout,return_sequences=True)
+            hidden_states2=tf.keras.layers.Bidirectional(rnn_cell2,merge_mode='concat')(hidden_states)
 
+            rnn_output_dim=self.params.rnn2_dim*2
+        #word attention
         with tf.variable_scope('word_attention') as scope:
             word_query = tf.get_variable('word_query', [rnn_output_dim, 1],
                                          initializer=tf.contrib.layers.xavier_initializer())
@@ -242,12 +247,12 @@ class Model(object):
                         tf.nn.softmax(
                             tf.reshape(
                                 tf.matmul(
-                                    tf.reshape(tf.tanh(hidden_states), [self.total_sents * self.seq_len, rnn_output_dim]),
+                                    tf.reshape(tf.tanh(hidden_states2), [self.total_sents * self.seq_len, rnn_output_dim]),
                                     word_query
                                 ), [self.total_sents, self.seq_len]
                             )
                         ), [self.total_sents, 1, self.seq_len]
-                    ), hidden_states
+                    ), hidden_states2
                 ), [self.total_sents, rnn_output_dim]
             )
 
@@ -570,7 +575,8 @@ if __name__ == "__main__":
     parser.add_argument('-seed', dest='seed', default=1234, type=int, help='seed for randomization')
     parser.add_argument('-alpha',dest='alpha',default=0.25,type=float,help='alpha in focal loss')
     parser.add_argument('-char_embed_size',dest='char_embed_size',default=16,type=int,help='character embed dimension')#用于character embedding
-    parser.add_argument('-rnn_dim',dest='rnn_dim',default=192,type=int,help='hidden state dimention of Bi-RNN')
+    parser.add_argument('-rnn_dim',dest='rnn_dim',default=192,type=int,help='hidden state dimension of Bi-RNN')
+    parser.add_argument('-rnn2_dim',dest='rnn2_dim',default=96,type=int,help='hidden state dimension of second bi-rnn')
     parser.add_argument('-rec_dropout',dest='rec_dropout',default=0.8,type=float,help='recurrent dropout for lstm')
     args = parser.parse_args()
 
