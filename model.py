@@ -5,6 +5,7 @@ import embeddings
 class Model(object):
 
     def __init__(self, params):
+        """我添加了模型注释"""
         self.params = params
         self.logger = get_logger(self.params.name, self.params.log_dir, self.params.config_dir)
         self.logger.info(vars(self.params))
